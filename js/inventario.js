@@ -141,11 +141,33 @@ style.textContent = `
   .reporte-resumen-item .rvalue.verde { color:#3a7d5a; }
 
   @media print {
-    body > * { display:none !important; }
-    #panel-pdf { display:block !important; margin:0 !important; }
-    #panel-pdf .card { box-shadow:none !important; border:none !important; padding:0 !important; }
-    #panel-pdf > .card > div:first-child { display:none !important; }
-    #contenido-pdf { border:none !important; padding:0 !important; }
+    /* Ocultar todo el layout */
+    .sidebar,
+    .topbar,
+    .page-header,
+    #content-movimientos,
+    #content-existencias .card:first-child,
+    #content-existencias .card:nth-child(2),
+    #content-existencias #card-existencias,
+    .tab-btn,
+    div[style*="border-bottom:2px solid"],
+    div[style*="border-bottom: 2px solid"] {
+      display: none !important;
+    }
+
+    /* Mostrar solo el panel PDF */
+    .main-content { margin-left: 0 !important; }
+    .page-content { padding: 0 !important; }
+    #panel-pdf { display: block !important; }
+    #panel-pdf > .card { box-shadow: none !important; border: none !important; padding: 0 !important; }
+    #panel-pdf > .card > div:first-child { display: none !important; }
+    #contenido-pdf { border: none !important; padding: 0 !important; }
+
+    /* Estilos del reporte en impresión */
+    body { background: white !important; }
+    .reporte-tabla thead tr { background: #1a3a2a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .reporte-tabla tbody tr:nth-child(even) { background: #f4f7f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .badge-ok, .badge-bajo, .badge-agotado { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 `;
 document.head.appendChild(style);
@@ -354,16 +376,20 @@ function generarHTMLReporte() {
 }
 
 function exportarPDF() {
-  if (todosExistencias.length === 0) { toast('Primero carga las existencias.', 'warning'); return; }
+  if (todosExistencias.length === 0) {
+    toast('Primero carga las existencias.', 'warning'); return;
+  }
   const html = generarHTMLReporte();
   document.getElementById('contenido-pdf').innerHTML = html;
   document.getElementById('panel-pdf').style.display = 'block';
-  // Scroll al panel
   document.getElementById('panel-pdf').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  toast('Vista previa generada. Usa "Imprimir / Guardar PDF" para descargar.', 'info', 4000);
+  toast('✅ Vista previa lista. Presiona "Imprimir / Guardar PDF".', 'success', 4000);
 }
 
 function imprimirDesdePanel() {
+  // Asegurarse que el panel tiene contenido antes de imprimir
+  const contenido = document.getElementById('contenido-pdf').innerHTML;
+  if (!contenido) { exportarPDF(); setTimeout(() => window.print(), 600); return; }
   window.print();
 }
 
@@ -372,9 +398,15 @@ function cerrarPanelPDF() {
 }
 
 function imprimirExistencias() {
-  // Generar el reporte y luego imprimir
-  exportarPDF();
-  setTimeout(() => window.print(), 500);
+  if (todosExistencias.length === 0) {
+    toast('Primero carga las existencias.', 'warning'); return;
+  }
+  // Generar reporte, mostrarlo y luego imprimir
+  const html = generarHTMLReporte();
+  document.getElementById('contenido-pdf').innerHTML = html;
+  document.getElementById('panel-pdf').style.display = 'block';
+  // Pequeña pausa para que el DOM se actualice antes de imprimir
+  setTimeout(() => window.print(), 400);
 }
 
 cargarMovimientos();
