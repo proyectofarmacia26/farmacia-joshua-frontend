@@ -6,7 +6,7 @@
 // ⚠️ IMPORTANTE: Cambia esta URL por la de tu backend en Render
 // Ejemplo: 'https://farmacia-joshua-backend.onrender.com/api'
 // Para desarrollo local usa: 'http://127.0.0.1:5000/api'
-const API = window.API_URL || 'https://farmacia-joshua-backend.onrender.com/api';
+const API = 'https://farmacia-joshua-backend.onrender.com/api';
 
 /* ── Auth ───────────────────────────────────────────────── */
 const Auth = {
