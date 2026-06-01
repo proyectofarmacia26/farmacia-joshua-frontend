@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Farmacia Joshua</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Merriweather+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    @media (max-width: 1024px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    .chart-bar-wrap { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .chart-bar-item { display: flex; align-items: center; gap: 10px; font-size: .82rem; }
+    .chart-bar-label { width: 130px; color: var(--texto-medio); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+    .chart-bar-track { flex: 1; height: 10px; background: var(--gris-claro); border-radius: 10px; overflow: hidden; }
+    .chart-bar-fill  { height: 100%; background: linear-gradient(90deg, var(--verde-principal), var(--verde-claro)); border-radius: 10px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+    .chart-bar-val   { color: var(--gris-texto); font-weight: 700; min-width: 60px; text-align: right; font-size: .78rem; }
+
+    .ventas-chart { display: flex; align-items: flex-end; gap: 8px; height: 130px; margin-top: 12px; }
+    .vcol { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .vcol-bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; }
+    .vcol-bar {
+      width: 100%; border-radius: 6px 6px 0 0;
+      background: linear-gradient(180deg, var(--verde-claro), var(--verde-principal));
+      min-height: 4px;
+      transition: height .5s;
+      cursor: pointer;
+      position: relative;
+    }
+    .vcol-bar:hover { opacity: .8; }
+    .vcol-label { font-size: .68rem; color: var(--gris-texto); font-weight: 600; }
+
+    .alert-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--gris-claro);
+    }
+    .alert-item:last-child { border-bottom: none; }
+    .alert-dot-big {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .alert-dot-big.rojo   { background: var(--rojo); }
+    .alert-dot-big.naranja{ background: var(--amarillo); }
+    .alert-dot-big.verde  { background: var(--verde-claro); }
+    .alert-item-title { font-size: .84rem; font-weight: 700; color: var(--texto-oscuro); }
+    .alert-item-sub   { font-size: .76rem; color: var(--gris-texto); margin-top: 1px; }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--gris-claro);
+      font-size: .85rem;
+    }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-row .label { color: var(--gris-texto); }
+    .stat-row .value { font-weight: 700; color: var(--texto-oscuro); }
+    .stat-row .value.verde { color: var(--verde-principal); }
+    .stat-row .value.rojo  { color: var(--rojo); }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">🏠 Dashboard</div>
+      <div class="topbar-meta">📅 <span id="topbar-date"></span></div>
+      <div class="topbar-meta">🕐 <span id="topbar-clock"></span></div>
+      <button class="topbar-alerts" onclick="window.location.href='alertas.html'">
+        🔔 <span class="alert-dot" id="alert-dot" style="display:none"></span>
+      </button>
+    </header>
+
+    <div class="page-content">
+      <div class="page-header">
+        <div>
+          <h2 id="bienvenida">Bienvenido 👋</h2>
+          <p>Resumen general de tu farmacia</p>
+        </div>
+        <button class="btn btn-primary" onclick="window.location.href='ventas.html'">➕ Nueva Venta</button>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card"><div class="kpi-icon verde">💰</div><div class="kpi-body"><div class="kpi-label">Ventas Hoy</div><div class="kpi-value" id="kpi-ventas-hoy">Q 0.00</div><div class="kpi-sub" id="kpi-num-hoy">0 transacciones</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon azul">📅</div><div class="kpi-body"><div class="kpi-label">Ventas del Mes</div><div class="kpi-value" id="kpi-ventas-mes">Q 0.00</div><div class="kpi-sub" id="kpi-num-mes">0 ventas</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon naranja">📦</div><div class="kpi-body"><div class="kpi-label">Total Productos</div><div class="kpi-value" id="kpi-productos">0</div><div class="kpi-sub" id="kpi-agotados">0 agotados</div></div></div>
+        <div class="kpi-card"><div class="kpi-icon rojo">🔔</div><div class="kpi-body"><div class="kpi-label">Alertas Activas</div><div class="kpi-value" id="kpi-alertas">0</div><div class="kpi-sub" id="kpi-alertas-sub">Sin alertas</div></div></div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Gráfica ventas 7 días -->
+        <div class="card">
+          <div class="card-title">📈 Ventas — Últimos 7 días</div>
+          <div class="ventas-chart" id="ventas-chart">
+            <div style="width:100%;display:flex;align-items:center;justify-content:center;color:var(--gris-texto);font-size:.85rem;">Cargando...</div>
+          </div>
+        </div>
+
+        <!-- Top productos -->
+        <div class="card">
+          <div class="card-title">🏆 Productos más vendidos (mes)</div>
+          <div class="chart-bar-wrap" id="top-productos">
+            <div style="color:var(--gris-texto);font-size:.85rem;">Cargando...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Alertas activas -->
+        <div class="card">
+          <div class="card-title">⚠️ Alertas Recientes</div>
+          <div id="alertas-list">
+            <div class="spinner"></div>
+          </div>
+          <a href="alertas.html" style="display:block;text-align:center;margin-top:12px;font-size:.82rem;color:var(--verde-principal);font-weight:700;">Ver todas las alertas →</a>
+        </div>
+
+        <!-- Inventario resumen -->
+        <div class="card">
+          <div class="card-title">📦 Estado del Inventario</div>
+          <div id="inventario-stats">
+            <div class="spinner"></div>
+          </div>
+          <a href="productos.html" style="display:block;text-align:center;margin-top:12px;font-size:.82rem;color:var(--verde-principal);font-weight:700;">Ir a productos →</a>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </div><!-- /main-content -->
+</div>
+
+<script src="js/main.js"></script>
+<script>
+  initLayout('dashboard');
+  const user = Auth.getUser();
+  if (user) document.getElementById('bienvenida').textContent = `Bienvenido, ${user.nombre} 👋`;
+
+  async function cargarDashboard() {
+    const data = await get('/reportes/dashboard');
+    if (!data?.ok) return;
+    const d = data.data;
+
+    // KPIs
+    document.getElementById('kpi-ventas-hoy').textContent = fmt.moneda(d.ventas_hoy.ingresos);
+    document.getElementById('kpi-num-hoy').textContent    = `${d.ventas_hoy.num_ventas} transacción(es)`;
+    document.getElementById('kpi-ventas-mes').textContent = fmt.moneda(d.ventas_mes.ingresos);
+    document.getElementById('kpi-num-mes').textContent    = `${d.ventas_mes.num_ventas} venta(s)`;
+    document.getElementById('kpi-productos').textContent  = d.inventario.total_productos;
+    document.getElementById('kpi-agotados').textContent   = `${d.inventario.agotados} agotado(s), ${d.inventario.stock_bajo} bajo stock`;
+    document.getElementById('kpi-alertas').textContent    = d.alertas.total;
+    document.getElementById('kpi-alertas-sub').textContent = d.alertas.total > 0
+      ? `${d.alertas.vencido} vencidos, ${d.alertas.stock_bajo} stock bajo`
+      : 'Sin alertas activas';
+
+    // Gráfica 7 días
+    const chartEl = document.getElementById('ventas-chart');
+    if (d.ventas_7dias.length === 0) {
+      chartEl.innerHTML = `<div style="width:100%;display:flex;align-items:center;justify-content:center;color:var(--gris-texto);font-size:.85rem;">Sin ventas en los últimos 7 días</div>`;
+    } else {
+      const maxVal = Math.max(...d.ventas_7dias.map(v => parseFloat(v.ingresos || 0)), 1);
+      chartEl.innerHTML = d.ventas_7dias.map(v => {
+        const pct = (parseFloat(v.ingresos || 0) / maxVal * 100).toFixed(1);
+        const dia = new Date(v.fecha).toLocaleDateString('es-GT', { weekday:'short', day:'numeric' });
+        return `<div class="vcol">
+          <div class="vcol-bar-wrap">
+            <div class="vcol-bar" style="height:${pct}%" title="${fmt.moneda(v.ingresos)}"></div>
+          </div>
+          <div class="vcol-label">${dia}</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Top productos
+    const topEl = document.getElementById('top-productos');
+    if (d.top_productos.length === 0) {
+      topEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>Sin ventas este mes aún</p></div>`;
+    } else {
+      const maxU = Math.max(...d.top_productos.map(p => p.total_unidades), 1);
+      topEl.innerHTML = d.top_productos.map(p => `
+        <div class="chart-bar-item">
+          <div class="chart-bar-label" title="${p.nombre}">${p.nombre}</div>
+          <div class="chart-bar-track">
+            <div class="chart-bar-fill" style="width:${(p.total_unidades/maxU*100).toFixed(1)}%"></div>
+          </div>
+          <div class="chart-bar-val">${p.total_unidades} uds</div>
+        </div>
+      `).join('');
+    }
+
+    // Alertas
+    const alertasEl = document.getElementById('alertas-list');
+    const alertasData = await get('/alertas/?atendida=false');
+    const alertas = alertasData?.data?.slice(0, 5) || [];
+    if (alertas.length === 0) {
+      alertasEl.innerHTML = `<div class="empty-state"><div class="empty-icon">✅</div><p>Sin alertas pendientes</p></div>`;
+    } else {
+      const colores = { vencido: 'rojo', stock_bajo: 'rojo', proximo_vencer: 'naranja' };
+      alertasEl.innerHTML = alertas.map(a => `
+        <div class="alert-item">
+          <div class="alert-dot-big ${colores[a.tipo] || 'verde'}"></div>
+          <div>
+            <div class="alert-item-title">${a.producto_nombre}</div>
+            <div class="alert-item-sub">${a.mensaje}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Inventario stats
+    document.getElementById('inventario-stats').innerHTML = `
+      <div class="stat-row"><span class="label">Total productos</span><span class="value">${d.inventario.total_productos}</span></div>
+      <div class="stat-row"><span class="label">Con stock bajo</span><span class="value rojo">${d.inventario.stock_bajo}</span></div>
+      <div class="stat-row"><span class="label">Agotados</span><span class="value rojo">${d.inventario.agotados}</span></div>
+      <div class="stat-row"><span class="label">Vencidos</span><span class="value rojo">${d.inventario.vencidos}</span></div>
+      
+    `;
+  }
+
+  cargarDashboard();
+</script>
+</body>
+</html>

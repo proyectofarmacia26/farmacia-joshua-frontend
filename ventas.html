@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nueva Venta — Farmacia Joshua</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Merriweather+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .venta-layout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
+    @media (max-width: 1024px) { .venta-layout { grid-template-columns: 1fr; } }
+
+    .producto-search-result {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: white; border: 2px solid var(--verde-principal);
+      border-top: none; border-radius: 0 0 10px 10px;
+      z-index: 50; max-height: 260px; overflow-y: auto;
+      box-shadow: var(--sombra-md);
+    }
+    .search-result-item {
+      padding: 10px 14px; cursor: pointer;
+      border-bottom: 1px solid var(--gris-claro);
+      transition: background .15s;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .search-result-item:hover { background: var(--verde-suave); }
+    .search-result-item:last-child { border-bottom: none; }
+    .sri-name  { font-size: .875rem; font-weight: 700; color: var(--texto-oscuro); }
+    .sri-code  { font-size: .75rem; color: var(--gris-texto); }
+    .sri-price { font-size: .875rem; font-weight: 700; color: var(--verde-principal); }
+
+    .carrito-item {
+      display: grid; grid-template-columns: 1fr auto auto auto;
+      gap: 8px; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--gris-claro); font-size: .84rem;
+    }
+    .carrito-item:last-child { border-bottom: none; }
+    .ci-name  { font-weight: 700; color: var(--texto-oscuro); font-size: .82rem; }
+    .ci-code  { font-size: .72rem; color: var(--gris-texto); }
+    .ci-qty   { width: 60px; text-align: center; padding: 5px 6px; border: 2px solid var(--gris-borde); border-radius: 6px; font-weight: 700; font-family: 'Nunito',sans-serif; }
+    .ci-price { font-weight: 700; color: var(--texto-oscuro); min-width: 70px; text-align: right; }
+    .ci-remove { color: var(--rojo); cursor: pointer; background: var(--rojo-suave); border: none; border-radius: 6px; width: 28px; height: 28px; display:flex;align-items:center;justify-content:center; font-size: .9rem; }
+    .ci-remove:hover { background: var(--rojo); color: white; }
+
+    .totales-box { background: var(--gris-bg); border-radius: 10px; padding: 16px; }
+    .total-row { display: flex; justify-content: space-between; font-size: .875rem; padding: 5px 0; color: var(--texto-medio); }
+    .total-row.grande { font-size: 1.15rem; font-weight: 800; color: var(--texto-oscuro); border-top: 2px solid var(--gris-borde); margin-top: 8px; padding-top: 10px; }
+    .total-row .desc { color: var(--rojo); }
+
+    /* RECIBO */
+    .recibo-overlay {
+      position: fixed; inset: 0;
+      background: rgba(10,24,17,.6); backdrop-filter: blur(4px);
+      z-index: 500; display: flex; align-items: center; justify-content: center;
+      padding: 20px; opacity: 0; pointer-events: none; transition: opacity .25s;
+    }
+    .recibo-overlay.active { opacity: 1; pointer-events: all; }
+    .recibo-wrapper {
+      background: white; border-radius: 14px;
+      width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3);
+      transform: scale(.95); transition: transform .25s;
+    }
+    .recibo-overlay.active .recibo-wrapper { transform: scale(1); }
+    .recibo-actions {
+      padding: 16px 24px; display: flex; gap: 10px;
+      justify-content: flex-end; border-bottom: 1px solid var(--gris-claro);
+    }
+
+    @media print {
+      body > *:not(.recibo-overlay) { display: none !important; }
+      .recibo-overlay { position: static !important; background: none !important; backdrop-filter: none !important; padding: 0 !important; opacity: 1 !important; }
+      .recibo-wrapper { box-shadow: none !important; border-radius: 0 !important; max-height: none !important; }
+      .recibo-actions { display: none !important; }
+    }
+
+    #recibo-content { padding: 32px; font-family: 'Nunito', sans-serif; }
+
+    .rec-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; gap: 20px; }
+    .rec-logo h1 { font-family:'Merriweather Sans',sans-serif; font-size: 1.6rem; font-weight:700; color: #1a3a2a; }
+    .rec-logo h1 span { color: #3a7d5a; }
+    .rec-logo p  { font-size: .78rem; color: #6b7c75; margin-top: 2px; }
+    .rec-title { text-align: center; }
+    .rec-title h2 { font-family:'Merriweather Sans',sans-serif; font-size: 1.05rem; font-weight:700; color: #1a3a2a; text-transform:uppercase; letter-spacing:.05em; }
+    .rec-num    { color: #e63946; font-weight: 800; font-size: .95rem; margin-top: 4px; }
+    .rec-gracias{ font-size: .75rem; color: #6b7c75; }
+    .rec-info-right { text-align: right; font-size: .78rem; color: #6b7c75; line-height: 1.8; }
+    .rec-info-right strong { color: #1a3a2a; }
+    .rec-divider { border: none; border-top: 2px dashed #c8ddd0; margin: 16px 0; }
+    .rec-cliente-row { display: flex; gap: 28px; margin-bottom: 18px; font-size: .84rem; flex-wrap: wrap; }
+    .rec-campo strong { display: block; color: #6b7c75; font-size: .72rem; text-transform:uppercase; letter-spacing:.05em; font-weight:700; margin-bottom: 2px; }
+    .rec-campo span   { color: #1a2e23; font-weight: 700; }
+
+    .rec-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin-bottom: 20px; }
+    .rec-table thead tr { background: #1a3a2a; color: white; }
+    .rec-table thead th { padding: 9px 10px; text-align: left; font-size: .72rem; text-transform:uppercase; letter-spacing:.05em; }
+    .rec-table tbody tr { border-bottom: 1px solid #e8f0eb; }
+    .rec-table tbody tr:last-child { border-bottom: none; }
+    .rec-table tbody td { padding: 9px 10px; color: #2d4a3a; }
+    .rec-table .text-right  { text-align: right; }
+    .rec-table .text-center { text-align: center; }
+
+    .rec-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px; }
+    .rec-pago-box { background: #f4f7f5; border-radius: 10px; padding: 14px 16px; }
+    .rec-pago-title { font-size: .72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color: #6b7c75; margin-bottom: 10px; }
+    .rec-pago-row { display:flex; justify-content:space-between; font-size: .84rem; margin-bottom: 6px; }
+    .rec-pago-row.cambio strong { font-size: 1rem; color: #3a7d5a; }
+    .rec-totales-box { text-align: right; }
+    .rec-tot-row { display:flex; justify-content:space-between; font-size:.84rem; color:#6b7c75; margin-bottom:5px; }
+    .rec-tot-row.grande { font-size:1.1rem; font-weight:800; color:#1a2e23; border-top:2px solid #c8ddd0; padding-top:8px; margin-top:8px; }
+    .rec-footer { border-top: 2px dashed #c8ddd0; margin-top: 22px; padding-top: 14px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; text-align: center; }
+    .rec-footer-item { font-size: .76rem; }
+    .rec-footer-item strong { display:block; color: #1a3a2a; margin-bottom: 3px; font-size: .78rem; }
+    .rec-footer-item span   { color: #6b7c75; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">🛒 Nueva Venta</div>
+      <div class="topbar-meta">🕐 <span id="topbar-clock"></span></div>
+      <button class="topbar-alerts" onclick="window.location.href='alertas.html'">
+        🔔 <span class="alert-dot" id="alert-dot" style="display:none"></span>
+      </button>
+    </header>
+
+    <div class="page-content">
+      <div class="venta-layout">
+
+        <!-- Columna izquierda -->
+        <div>
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-title">🔍 Buscar Producto</div>
+            <div style="position:relative;">
+              <div class="search-bar" style="max-width:100%;">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="buscar-producto" placeholder="Nombre o código del producto..." autocomplete="off" class="form-control" style="padding-left:38px;border-radius:25px;">
+              </div>
+              <div id="search-results" class="producto-search-result" style="display:none;"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">🛒 Productos en la Venta</div>
+            <div id="carrito-items">
+              <div class="empty-state"><div class="empty-icon">🛒</div><p>Busca y agrega productos</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha -->
+        <div>
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">👤 Cliente</div>
+
+            <!-- Estado: buscar cliente -->
+            <div id="panel-buscar-cliente">
+              <div class="form-group" style="margin-bottom:8px;position:relative;">
+                <input type="text" id="buscar-cliente" placeholder="Buscar cliente registrado..." class="form-control" autocomplete="off">
+                <div id="cliente-results"></div>
+              </div>
+              <button onclick="mostrarNuevoCliente()" style="
+                width:100%;padding:8px;background:none;
+                border:2px dashed var(--gris-borde);border-radius:8px;
+                color:var(--verde-principal);font-family:'Nunito',sans-serif;
+                font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;
+              " onmouseover="this.style.borderColor='var(--verde-principal)';this.style.background='var(--verde-suave)'"
+                 onmouseout="this.style.borderColor='var(--gris-borde)';this.style.background='none'">
+                ➕ Cliente nuevo (no registrado)
+              </button>
+            </div>
+
+            <!-- Estado: registrar cliente nuevo rápido -->
+            <div id="panel-nuevo-cliente" style="display:none;">
+              <div style="background:var(--verde-suave);border-radius:8px;padding:12px;margin-bottom:8px;">
+                <div style="font-size:.8rem;font-weight:700;color:var(--verde-medio);margin-bottom:10px;">➕ Registrar cliente nuevo</div>
+                <div class="form-group" style="margin-bottom:8px;">
+                  <input type="text" id="nuevo-cli-nombre" class="form-control" placeholder="Nombre del cliente *" style="font-size:.875rem;">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                  <input type="text" id="nuevo-cli-telefono" class="form-control" placeholder="Teléfono (opcional)" style="font-size:.875rem;">
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button onclick="registrarClienteNuevo()" class="btn btn-primary btn-sm" style="flex:1;">✅ Registrar y Usar</button>
+                <button onclick="cancelarNuevoCliente()" class="btn btn-secondary btn-sm">✕</button>
+              </div>
+            </div>
+
+            <!-- Estado: cliente seleccionado -->
+            <div id="cliente-seleccionado" style="display:none;font-size:.84rem;background:var(--verde-suave);padding:10px 12px;border-radius:8px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                  <span style="font-size:.72rem;color:var(--verde-medio);font-weight:700;text-transform:uppercase;letter-spacing:.04em;">Cliente seleccionado</span>
+                  <div style="font-weight:800;color:var(--texto-oscuro);font-size:.9rem;" id="cliente-nombre-sel"></div>
+                  <div style="font-size:.75rem;color:var(--gris-texto);" id="cliente-tel-sel"></div>
+                </div>
+                <button onclick="limpiarCliente()" style="background:none;border:none;color:var(--rojo);cursor:pointer;font-size:1.1rem;padding:4px;" title="Cambiar cliente">✕</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">💳 Forma de Pago</div>
+            <select id="forma-pago" class="form-control" style="margin-bottom:10px;" onchange="toggleEfectivo()">
+              <option value="efectivo">💵 Efectivo</option>
+              <option value="tarjeta">💳 Tarjeta</option>
+              <option value="transferencia">🏦 Transferencia</option>
+            </select>
+            <div id="efectivo-campos">
+              <label class="form-label">Monto recibido (Q)</label>
+              <input type="number" id="monto-pagado" class="form-control" placeholder="0.00" min="0" step="0.01" oninput="calcularCambio()">
+              <div style="margin-top:8px;background:var(--verde-suave);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:.84rem;color:var(--gris-texto);font-weight:700;">Cambio:</span>
+                <span id="cambio-display" style="font-size:1rem;font-weight:800;color:var(--verde-principal);">Q 0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resumen SIN IVA -->
+          <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">🧾 Resumen</div>
+            <div class="totales-box">
+              <div class="total-row"><span>Subtotal</span><span id="tot-subtotal">Q 0.00</span></div>
+              <div class="total-row"><span class="desc">Descuento</span><span class="desc" id="tot-descuento">- Q 0.00</span></div>
+              <div class="total-row grande"><span>TOTAL</span><span id="tot-total">Q 0.00</span></div>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-lg" style="width:100%;" id="btn-venta" onclick="registrarVenta()">
+            ✅ Confirmar Venta
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- RECIBO -->
+<div class="recibo-overlay" id="recibo-overlay">
+  <div class="recibo-wrapper">
+    <div class="recibo-actions">
+      <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Imprimir</button>
+      <button class="btn btn-primary btn-sm" onclick="nuevaVenta()">➕ Nueva Venta</button>
+      <button class="btn btn-secondary btn-sm" onclick="nuevaVenta()">✕ Cerrar</button>
+    </div>
+    <div id="recibo-content"></div>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+  initLayout('ventas');
+
+  let carrito       = [];
+  let clienteId     = null;
+  let clienteNombre = 'Consumidor Final';
+  let searchTimeout = null;
+
+  // ── Buscar producto ──────────────────────────────────────
+  document.getElementById('buscar-producto').addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    const q = e.target.value.trim();
+    if (q.length < 2) { document.getElementById('search-results').style.display = 'none'; return; }
+    searchTimeout = setTimeout(() => buscarProducto(q), 300);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#buscar-producto') && !e.target.closest('#search-results'))
+      document.getElementById('search-results').style.display = 'none';
+    if (!e.target.closest('#buscar-cliente') && !e.target.closest('#cliente-results'))
+      document.getElementById('cliente-results').innerHTML = '';
+  });
+
+  async function buscarProducto(q) {
+    const data = await get(`/productos/?q=${encodeURIComponent(q)}&activo=true&limit=8`);
+    if (!data?.ok) return;
+    const prods = data.data.productos;
+    const el = document.getElementById('search-results');
+    if (prods.length === 0) {
+      el.innerHTML = '<div style="padding:12px;color:var(--gris-texto);font-size:.84rem;">No se encontraron productos</div>';
+    } else {
+      el.innerHTML = prods.map(p => `
+        <div class="search-result-item" onclick="agregarAlCarrito('${p.id}','${p.codigo}','${p.nombre.replace(/'/g,"\\'")}',${p.precio_unitario},${p.stock})">
+          <div>
+            <div class="sri-name">${p.nombre}</div>
+            <div class="sri-code">${p.codigo} · Stock: ${p.stock}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="sri-price">${fmt.moneda(p.precio_unitario)}</div>
+            ${p.estado_stock === 'agotado' ? '<div style="font-size:.72rem;color:var(--rojo);">⚠️ Agotado</div>' : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+    el.style.display = 'block';
+  }
+
+  function agregarAlCarrito(id, codigo, nombre, precio, stock) {
+    document.getElementById('search-results').style.display = 'none';
+    document.getElementById('buscar-producto').value = '';
+    const existente = carrito.find(i => i.id === id);
+    if (existente) {
+      if (existente.cantidad >= stock) { toast('No hay más stock disponible.', 'warning'); return; }
+      existente.cantidad++;
+    } else {
+      if (stock <= 0) { toast('Producto agotado.', 'error'); return; }
+      carrito.push({ id, codigo, nombre, precio: parseFloat(precio), cantidad: 1, descuento: 0, stock });
+    }
+    renderCarrito();
+    toast(`${nombre} agregado`, 'success', 1500);
+  }
+
+  function renderCarrito() {
+    const el = document.getElementById('carrito-items');
+    if (carrito.length === 0) {
+      el.innerHTML = '<div class="empty-state"><div class="empty-icon">🛒</div><p>Busca y agrega productos</p></div>';
+      actualizarTotales(); return;
+    }
+    el.innerHTML = carrito.map((item, idx) => `
+      <div class="carrito-item">
+        <div>
+          <div class="ci-name">${item.nombre}</div>
+          <div class="ci-code">${item.codigo} · ${fmt.moneda(item.precio)} c/u</div>
+        </div>
+        <input type="number" class="ci-qty" value="${item.cantidad}" min="1" max="${item.stock}"
+               onchange="cambiarCantidad(${idx}, this.value)">
+        <div class="ci-price">${fmt.moneda(item.precio * item.cantidad)}</div>
+        <button class="ci-remove" onclick="quitarItem(${idx})">✕</button>
+      </div>
+    `).join('');
+    actualizarTotales();
+  }
+
+  function cambiarCantidad(idx, val) {
+    const n = parseInt(val);
+    if (n < 1) carrito[idx].cantidad = 1;
+    else if (n > carrito[idx].stock) { toast('Stock insuficiente.', 'warning'); carrito[idx].cantidad = carrito[idx].stock; }
+    else carrito[idx].cantidad = n;
+    renderCarrito();
+  }
+
+  function quitarItem(idx) { carrito.splice(idx, 1); renderCarrito(); }
+
+  // ── Totales SIN IVA ──────────────────────────────────────
+  function actualizarTotales() {
+    const subtotal  = carrito.reduce((s, i) => s + (i.precio * i.cantidad), 0);
+    const descuento = carrito.reduce((s, i) => s + (i.descuento * i.cantidad), 0);
+    const total     = subtotal - descuento;    // sin IVA
+
+    document.getElementById('tot-subtotal').textContent  = fmt.moneda(subtotal);
+    document.getElementById('tot-descuento').textContent = `- ${fmt.moneda(descuento)}`;
+    document.getElementById('tot-total').textContent     = fmt.moneda(total);
+    calcularCambio();
+  }
+
+  function calcularCambio() {
+    const total  = parseFloat(document.getElementById('tot-total').textContent.replace('Q ','')) || 0;
+    const pagado = parseFloat(document.getElementById('monto-pagado').value) || 0;
+    document.getElementById('cambio-display').textContent = fmt.moneda(Math.max(pagado - total, 0));
+  }
+
+  function toggleEfectivo() {
+    const forma = document.getElementById('forma-pago').value;
+    document.getElementById('efectivo-campos').style.display = forma === 'efectivo' ? 'block' : 'none';
+  }
+
+  // ── Buscar cliente existente ─────────────────────────────
+  document.getElementById('buscar-cliente').addEventListener('input', async (e) => {
+    const q = e.target.value.trim();
+    const resultsEl = document.getElementById('cliente-results');
+    if (q.length < 2) { resultsEl.innerHTML = ''; return; }
+    const data = await get(`/clientes/?q=${encodeURIComponent(q)}&limit=6`);
+    if (!data?.ok) return;
+    const list = data.data.clientes;
+    if (list.length === 0) {
+      resultsEl.innerHTML = `
+        <div style="position:absolute;top:100%;left:0;right:0;background:white;border:2px solid var(--gris-borde);border-top:none;border-radius:0 0 10px 10px;z-index:50;box-shadow:var(--sombra-md);padding:10px 14px;font-size:.84rem;color:var(--gris-texto);">
+          No encontrado. <span onclick="mostrarNuevoCliente('${q.replace(/'/g,"\\'")}');" style="color:var(--verde-principal);font-weight:700;cursor:pointer;">➕ Registrar "${q}"</span>
+        </div>`;
+    } else {
+      resultsEl.innerHTML = `
+        <div style="position:absolute;top:100%;left:0;right:0;background:white;border:2px solid var(--verde-principal);border-top:none;border-radius:0 0 10px 10px;z-index:50;box-shadow:var(--sombra-md);">
+          ${list.map(c => `
+            <div onclick="seleccionarCliente('${c.id}','${c.nombre.replace(/'/g,"\\'")}','${c.telefono||''}')"
+              style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gris-claro);font-size:.84rem;display:flex;justify-content:space-between;align-items:center;"
+              onmouseover="this.style.background='var(--verde-suave)'" onmouseout="this.style.background='white'">
+              <div><strong>${c.nombre}</strong></div>
+              <span style="color:var(--gris-texto);font-size:.78rem;">${c.telefono || ''}</span>
+            </div>`).join('')}
+        </div>`;
+    }
+  });
+
+  // Cerrar dropdown al hacer clic fuera
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#buscar-cliente') && !e.target.closest('#cliente-results'))
+      document.getElementById('cliente-results').innerHTML = '';
+  });
+
+  function seleccionarCliente(id, nombre, telefono) {
+    clienteId = id; clienteNombre = nombre;
+    document.getElementById('buscar-cliente').value = '';
+    document.getElementById('cliente-results').innerHTML = '';
+    document.getElementById('cliente-nombre-sel').textContent = nombre;
+    document.getElementById('cliente-tel-sel').textContent = telefono ? '📞 ' + telefono : '';
+    document.getElementById('panel-buscar-cliente').style.display = 'none';
+    document.getElementById('panel-nuevo-cliente').style.display = 'none';
+    document.getElementById('cliente-seleccionado').style.display = 'block';
+  }
+
+  function mostrarNuevoCliente(nombrePrellenado = '') {
+    document.getElementById('cliente-results').innerHTML = '';
+    document.getElementById('buscar-cliente').value = '';
+    document.getElementById('nuevo-cli-nombre').value = nombrePrellenado;
+    document.getElementById('nuevo-cli-telefono').value = '';
+    document.getElementById('panel-buscar-cliente').style.display = 'none';
+    document.getElementById('panel-nuevo-cliente').style.display = 'block';
+    document.getElementById('nuevo-cli-nombre').focus();
+  }
+
+  function cancelarNuevoCliente() {
+    document.getElementById('panel-nuevo-cliente').style.display = 'none';
+    document.getElementById('panel-buscar-cliente').style.display = 'block';
+  }
+
+  async function registrarClienteNuevo() {
+    const nombre   = document.getElementById('nuevo-cli-nombre').value.trim();
+    const telefono = document.getElementById('nuevo-cli-telefono').value.trim();
+    if (!nombre) {
+      toast('Escribe el nombre del cliente.', 'warning');
+      document.getElementById('nuevo-cli-nombre').focus();
+      return;
+    }
+
+    const data = await post('/clientes/', { nombre, telefono: telefono || null });
+    if (!data?.ok) { toast(data?.message || 'Error al registrar cliente.', 'error'); return; }
+
+    // FIX: el backend retorna { id, nombre } en data.data
+    // Usamos los valores que el usuario escribió para asegurar que se muestren correctamente
+    const nuevoId  = data.data.id;
+    const nuevoNombre = nombre;      // lo que escribió el usuario
+    const nuevoTel    = telefono;    // lo que escribió el usuario
+
+    seleccionarCliente(nuevoId, nuevoNombre, nuevoTel);
+    toast(`✅ Cliente "${nuevoNombre}" registrado y seleccionado.`, 'success');
+  }
+
+  function limpiarCliente() {
+    clienteId = null; clienteNombre = 'Consumidor Final';
+    document.getElementById('cliente-seleccionado').style.display = 'none';
+    document.getElementById('panel-nuevo-cliente').style.display = 'none';
+    document.getElementById('panel-buscar-cliente').style.display = 'block';
+    document.getElementById('buscar-cliente').value = '';
+    document.getElementById('cliente-results').innerHTML = '';
+  }
+
+  // ── Registrar venta ──────────────────────────────────────
+  async function registrarVenta() {
+    if (carrito.length === 0) { toast('Agrega al menos un producto.', 'warning'); return; }
+
+    const forma  = document.getElementById('forma-pago').value;
+    const total  = parseFloat(document.getElementById('tot-total').textContent.replace('Q ','')) || 0;
+    let   pagado = parseFloat(document.getElementById('monto-pagado').value) || 0;
+
+    if (forma === 'efectivo' && pagado < total) {
+      toast(`Monto insuficiente. Total: ${fmt.moneda(total)}`, 'warning'); return;
+    }
+    if (forma !== 'efectivo') pagado = total;
+
+    const btn = document.getElementById('btn-venta');
+    btn.disabled = true; btn.textContent = '⏳ Procesando...';
+
+    const body = {
+      cliente_id:     clienteId || '00000000-0000-0000-0000-000000000001',
+      forma_pago:     forma,
+      monto_pagado:   pagado,
+      iva_porcentaje: 0,
+      productos: carrito.map(i => ({ producto_id: i.id, cantidad: i.cantidad, descuento: i.descuento }))
+    };
+
+    const data = await post('/ventas/', body);
+    btn.disabled = false; btn.textContent = '✅ Confirmar Venta';
+
+    if (!data?.ok) { toast(data?.message || 'Error al registrar la venta.', 'error'); return; }
+
+    // Pasar el nombre actual del cliente al recibo ANTES de limpiar
+    const nombreParaRecibo = clienteNombre;
+    mostrarRecibo(data.data, nombreParaRecibo);
+
+    // Limpiar estado DESPUÉS de mostrar el recibo
+    carrito = [];
+    limpiarCliente();
+    document.getElementById('monto-pagado').value = '';
+  }
+
+  // ── Recibo SIN IVA ───────────────────────────────────────
+  async function mostrarRecibo(venta, nombreClienteActual) {
+    const configData = await get('/configuracion/');
+    const cfg = configData?.data?.config || {};
+
+    const detalle  = venta.detalle || [];
+    const fecha    = new Date(venta.fecha_venta || venta.created_at || new Date());
+    const fechaStr = fecha.toLocaleDateString('es-GT', { day:'2-digit', month:'long', year:'numeric' });
+    const horaStr  = fecha.toLocaleTimeString('es-GT', { hour:'2-digit', minute:'2-digit' });
+
+    // FIX: usar el nombre del cliente que se capturó antes de limpiar
+    // Prioridad: nombre en la venta > nombre capturado > Consumidor Final
+    const nombreMostrar = venta.cliente_nombre && venta.cliente_nombre !== 'Consumidor Final'
+      ? venta.cliente_nombre
+      : (nombreClienteActual && nombreClienteActual !== 'Consumidor Final'
+          ? nombreClienteActual
+          : 'Consumidor Final');
+
+    const filas = detalle.map(d => `
+      <tr>
+        <td class="text-center">${d.cantidad}</td>
+        <td>${d.codigo || d.producto_codigo || ''}</td>
+        <td>${d.producto_nombre}</td>
+        <td class="text-right">Q ${parseFloat(d.precio_unitario).toFixed(2)}</td>
+        <td class="text-right">${parseFloat(d.descuento) > 0 ? '- Q ' + parseFloat(d.descuento).toFixed(2) : '—'}</td>
+        <td class="text-right"><strong>Q ${parseFloat(d.subtotal).toFixed(2)}</strong></td>
+      </tr>
+    `).join('');
+
+    const subtotal  = parseFloat(venta.subtotal || 0).toFixed(2);
+    const descuento = parseFloat(venta.descuento_total || 0).toFixed(2);
+    const total     = parseFloat(venta.total || 0).toFixed(2);
+    const pagado    = parseFloat(venta.monto_pagado || 0).toFixed(2);
+    const cambio    = parseFloat(venta.cambio || 0).toFixed(2);
+
+    document.getElementById('recibo-content').innerHTML = `
+      <div class="rec-header">
+        <div class="rec-logo">
+          <h1>Farmacia <span>Joshua</span></h1>
+          <p>➕ ${cfg.farmacia_slogan || 'Tu salud, nuestra prioridad'}</p>
+        </div>
+        <div class="rec-title">
+          <h2>Recibo de Compra</h2>
+          <div class="rec-num">N° ${venta.codigo_venta}</div>
+          <div class="rec-gracias">Gracias por su compra</div>
+        </div>
+        <div class="rec-info-right">
+          <div>📍 <strong>${cfg.farmacia_direccion || 'San Martín Zapotitlán, Retalhuleu'}</strong></div>
+          <div>📞 <strong>${cfg.farmacia_telefono || ''}</strong></div>
+          <div>📅 <strong>${fechaStr} · ${horaStr}</strong></div>
+        </div>
+      </div>
+
+      <hr class="rec-divider">
+
+      <div class="rec-cliente-row">
+        <div class="rec-campo"><strong>Cliente</strong><span>${nombreMostrar}</span></div>
+        <div class="rec-campo"><strong>Cajero</strong><span>${venta.cajero_nombre || Auth.getUser()?.nombre || ''}</span></div>
+        <div class="rec-campo"><strong>Código</strong><span>${venta.codigo_venta}</span></div>
+        <div class="rec-campo"><strong>Forma de Pago</strong><span style="text-transform:capitalize">${venta.forma_pago}</span></div>
+      </div>
+
+      <table class="rec-table">
+        <thead>
+          <tr>
+            <th class="text-center">Cant.</th>
+            <th>Código</th>
+            <th>Descripción</th>
+            <th class="text-right">P. Unitario</th>
+            <th class="text-right">Descuento</th>
+            <th class="text-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+
+      <div class="rec-bottom">
+        <div class="rec-pago-box">
+          <div class="rec-pago-title">💳 Detalle de Pago</div>
+          <div class="rec-pago-row"><span style="text-transform:capitalize">${venta.forma_pago}</span><strong>Q ${pagado}</strong></div>
+          <hr style="border:none;border-top:1px dashed #c8ddd0;margin:8px 0">
+          <div class="rec-pago-row cambio"><span>Cambio</span><strong style="color:#3a7d5a">Q ${cambio}</strong></div>
+        </div>
+        <div class="rec-totales-box">
+          <div class="rec-tot-row"><span>Subtotal:</span><span>Q ${subtotal}</span></div>
+          ${parseFloat(descuento) > 0 ? `<div class="rec-tot-row"><span>Descuento:</span><span style="color:#e63946">- Q ${descuento}</span></div>` : ''}
+          <div class="rec-tot-row grande"><span>TOTAL:</span><span>Q ${total}</span></div>
+        </div>
+      </div>
+
+      <div class="rec-footer">
+        <div class="rec-footer-item">❤️<strong>¡Gracias por preferirnos!</strong><span>Cuida tu salud, cuida tu vida.</span></div>
+        <div class="rec-footer-item">🛡️<strong>Política de cambios:</strong><span>${cfg.politica_cambios || 'No se aceptan cambios ni devoluciones de medicamentos una vez vendidos.'}</span></div>
+        <div class="rec-footer-item">➕<strong>Estamos para servirte</strong><span>Tu bienestar es nuestra misión.</span></div>
+      </div>
+    `;
+
+    document.getElementById('recibo-overlay').classList.add('active');
+  }
+
+  function cerrarRecibo() { document.getElementById('recibo-overlay').classList.remove('active'); }
+
+  // FIX: nueva venta limpia TODOS los campos correctamente
+  function nuevaVenta() {
+    cerrarRecibo();
+
+    // Limpiar carrito
+    carrito = [];
+    renderCarrito();
+
+    // Limpiar cliente
+    limpiarCliente();
+
+    // Limpiar pago
+    document.getElementById('monto-pagado').value = '';
+    document.getElementById('cambio-display').textContent = 'Q 0.00';
+
+    // Limpiar totales
+    document.getElementById('tot-subtotal').textContent  = 'Q 0.00';
+    document.getElementById('tot-descuento').textContent = '- Q 0.00';
+    document.getElementById('tot-total').textContent     = 'Q 0.00';
+
+    // Resetear forma de pago a efectivo
+    document.getElementById('forma-pago').value = 'efectivo';
+    document.getElementById('efectivo-campos').style.display = 'block';
+
+    // Foco en búsqueda de producto
+    document.getElementById('buscar-producto').focus();
+  }
+</script>
+</body>
+</html>

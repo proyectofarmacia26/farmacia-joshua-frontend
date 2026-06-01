@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productos — Farmacia Joshua</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Merriweather+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">💊 Productos</div>
+      <div class="topbar-meta">🕐 <span id="topbar-clock"></span></div>
+      <button class="topbar-alerts" onclick="window.location.href='alertas.html'">🔔<span class="alert-dot" id="alert-dot" style="display:none"></span></button>
+    </header>
+    <div class="page-content">
+      <div class="page-header">
+        <div><h2>Gestión de Productos</h2><p>Administra el catálogo de medicamentos y productos</p></div>
+        <button class="btn btn-primary" onclick="abrirModal()">➕ Nuevo Producto</button>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <div class="search-bar"><span class="search-icon">🔍</span><input type="text" id="filtro-q" placeholder="Buscar por nombre o código..." oninput="filtrar()"></div>
+          <select id="filtro-estado" class="form-control" style="width:160px;" onchange="filtrar()">
+            <option value="">Todos los estados</option>
+            <option value="ok">Stock OK</option>
+            <option value="stock_bajo">Stock Bajo</option>
+            <option value="agotado">Agotado</option>
+          </select>
+          <select id="filtro-activo" class="form-control" style="width:140px;" onchange="filtrar()">
+            <option value="true">Activos</option>
+            <option value="false">Inactivos</option>
+            <option value="all">Todos</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="limpiarFiltros()">✕ Limpiar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Vencimiento</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="tabla-productos"><tr class="loading-row"><td colspan="8"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+        <div id="paginacion"></div>
+        <div id="tabla-info" style="text-align:center;font-size:.8rem;color:var(--gris-texto);margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Producto -->
+<div class="modal-overlay" id="modal-producto">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <h3 id="modal-titulo">Nuevo Producto</h3>
+      <button class="btn-close-modal" onclick="cerrarModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="prod-id">
+
+      <!-- FIX: Categoría PRIMERO para generar el prefijo del código automáticamente -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select id="prod-categoria" class="form-control" onchange="actualizarPrefijoCodigo()">
+            <option value="">Sin categoría</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Código * <span id="prefijo-hint" style="color:var(--gris-texto);font-size:.75rem;font-weight:400;"></span></label>
+          <input type="text" id="prod-codigo" class="form-control" placeholder="Selecciona categoría primero">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Nombre del Producto *</label>
+        <input type="text" id="prod-nombre" class="form-control" placeholder="Ej: Paracetamol 500mg (Caja x 10)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción</label>
+        <textarea id="prod-descripcion" class="form-control" rows="2" placeholder="Descripción del producto..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Precio Unitario (Q) *</label>
+          <input type="number" id="prod-precio" class="form-control" placeholder="0.00" min="0.01" step="0.01">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Stock Inicial *</label>
+          <input type="number" id="prod-stock" class="form-control" placeholder="0" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Stock Mínimo</label>
+          <input type="number" id="prod-stock-min" class="form-control" placeholder="5" min="0" value="5">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <!-- FIX fecha: input tipo text con formato dd/mm/aaaa -->
+          <label class="form-label">Fecha Vencimiento <span style="color:var(--gris-texto);font-weight:400;font-size:.75rem;">(dd/mm/aaaa)</span></label>
+          <input type="text" id="prod-vencimiento" class="form-control" placeholder="dd/mm/aaaa" maxlength="10" oninput="formatearFecha(this)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Días Alerta Venc.</label>
+          <input type="number" id="prod-dias-alerta" class="form-control" value="30" min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Proveedor</label>
+          <select id="prod-proveedor" class="form-control"><option value="">Sin proveedor</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-guardar" onclick="guardarProducto()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ajuste Stock -->
+<div class="modal-overlay" id="modal-ajuste">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header"><h3>📦 Ajuste de Stock</h3><button class="btn-close-modal" onclick="cerrarAjuste()">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="ajuste-prod-id">
+      <p id="ajuste-prod-nombre" style="font-weight:700;color:var(--texto-oscuro);margin-bottom:14px;"></p>
+      <div class="form-group">
+        <label class="form-label">Nueva cantidad en stock</label>
+        <input type="number" id="ajuste-cantidad" class="form-control" min="0" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Motivo del ajuste</label>
+        <input type="text" id="ajuste-motivo" class="form-control" placeholder="Ej: Conteo físico, Devolución...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarAjuste()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarAjuste()">✅ Aplicar Ajuste</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+  initLayout('productos');
+  let paginaActual = 1; const LIMIT = 15;
+
+  // Prefijos por categoría
+  const prefijos = {
+    'Medicamento':     'MED',
+    'Suplemento':      'SUP',
+    'Higiene personal':'HIG',
+    'Material médico': 'MAT',
+    'Otros':           'OTR',
+  };
+
+  // FIX: Formatear fecha automáticamente al escribir dd/mm/aaaa
+  function formatearFecha(input) {
+    let val = input.value.replace(/\D/g,'');
+    if (val.length >= 3 && val.length <= 4) val = val.slice(0,2)+'/'+val.slice(2);
+    else if (val.length > 4) val = val.slice(0,2)+'/'+val.slice(2,4)+'/'+val.slice(4,8);
+    input.value = val;
+  }
+
+  // Convertir dd/mm/aaaa → YYYY-MM-DD para el backend
+  function fechaDisplayToISO(val) {
+    if (!val || val.length < 10) return null;
+    const partes = val.split('/');
+    if (partes.length !== 3) return null;
+    const [dd, mm, aaaa] = partes;
+    if (dd.length !== 2 || mm.length !== 2 || aaaa.length !== 4) return null;
+    return `${aaaa}-${mm}-${dd}`;
+  }
+
+  // Convertir YYYY-MM-DD → dd/mm/aaaa para mostrar en el input
+  function fechaISOToDisplay(val) {
+    if (!val) return '';
+    const partes = val.split('-');
+    if (partes.length !== 3) return val;
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+  }
+
+  function actualizarPrefijoCodigo() {
+    const catEl = document.getElementById('prod-categoria');
+    const catNombre = catEl.options[catEl.selectedIndex]?.text || '';
+    const prefijo = prefijos[catNombre];
+    const codigoInput = document.getElementById('prod-codigo');
+    const hint = document.getElementById('prefijo-hint');
+
+    if (prefijo && !document.getElementById('prod-id').value) {
+      hint.textContent = `→ Prefijo: ${prefijo}-`;
+      codigoInput.placeholder = `${prefijo}-001`;
+      // Si el código está vacío o solo tiene el prefijo anterior, actualizarlo
+      const valorActual = codigoInput.value;
+      const esPrefijoAnterior = Object.values(prefijos).some(p => valorActual.startsWith(p+'-') && valorActual.split('-').length === 2 && valorActual.split('-')[1] === '');
+      if (!valorActual || esPrefijoAnterior) {
+        codigoInput.value = prefijo + '-';
+      }
+      codigoInput.focus();
+    } else {
+      hint.textContent = '';
+      codigoInput.placeholder = 'Ej: MED-001';
+    }
+  }
+
+  async function cargarProductos() {
+    const q = document.getElementById('filtro-q').value.trim();
+    const estado = document.getElementById('filtro-estado').value;
+    const activo = document.getElementById('filtro-activo').value;
+    let url = `/productos/?page=${paginaActual}&limit=${LIMIT}&activo=${activo}`;
+    if (q) url += `&q=${encodeURIComponent(q)}`;
+    if (estado) url += `&estado=${estado}`;
+    document.getElementById('tabla-productos').innerHTML = '<tr class="loading-row"><td colspan="8"><div class="spinner"></div></td></tr>';
+    const data = await get(url);
+    if (!data?.ok) return;
+    const { productos, total, total_pages } = data.data;
+    document.getElementById('tabla-info').textContent = `Mostrando ${productos.length} de ${total} productos`;
+    if (productos.length === 0) {
+      document.getElementById('tabla-productos').innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">💊</div><p>No se encontraron productos</p></div></td></tr>`;
+      return;
+    }
+    const estadoBadge = (p) => {
+      if (p.estado_stock === 'agotado')    return '<span class="badge badge-rojo">⚠️ Agotado</span>';
+      if (p.estado_stock === 'stock_bajo') return '<span class="badge badge-naranja">📉 Stock Bajo</span>';
+      return '<span class="badge badge-verde">✅ OK</span>';
+    };
+    const vencBadge = (p) => {
+      if (!p.fecha_vencimiento) return '—';
+      if (p.estado_vencimiento === 'vencido')        return `<span class="badge badge-rojo">❌ Vencido</span>`;
+      if (p.estado_vencimiento === 'proximo_vencer') return `<span class="badge badge-naranja">⚠️ ${p.dias_para_vencer}d</span>`;
+      return `<span style="font-size:.8rem;color:var(--gris-texto)">${fmt.fecha(p.fecha_vencimiento)}</span>`;
+    };
+    document.getElementById('tabla-productos').innerHTML = productos.map(p => `
+      <tr>
+        <td><code style="background:var(--gris-bg);padding:2px 6px;border-radius:4px;font-size:.78rem;">${p.codigo}</code></td>
+        <td style="font-weight:600;">${p.nombre}</td>
+        <td><span class="badge badge-azul">${p.categoria_nombre || 'Sin cat.'}</span></td>
+        <td style="font-weight:700;color:var(--verde-principal)">${fmt.moneda(p.precio_unitario)}</td>
+        <td>
+          <span style="font-weight:700;color:${p.stock < p.stock_minimo ? 'var(--rojo)' : 'var(--texto-oscuro)'}">${p.stock}</span>
+          <span style="font-size:.72rem;color:var(--gris-texto)"> / mín ${p.stock_minimo}</span>
+        </td>
+        <td>${vencBadge(p)}</td>
+        <td>${estadoBadge(p)}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="editarProducto(${JSON.stringify(p).replace(/"/g,'&quot;')})">✏️</button>
+            <button class="btn btn-secondary btn-sm" onclick="abrirAjuste('${p.id}','${p.nombre.replace(/'/g,"\\'")}',${p.stock})">📦</button>
+            ${Auth.isAdmin() ? `<button class="btn btn-danger btn-sm" onclick="eliminarProducto('${p.id}','${p.nombre.replace(/'/g,"\\'")}')">🗑️</button>` : ''}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+    renderPagination('paginacion', paginaActual, total_pages, 'cambiarPagina');
+  }
+
+  function cambiarPagina(p) { paginaActual = p; cargarProductos(); }
+  let filtroTimeout;
+  function filtrar() { clearTimeout(filtroTimeout); filtroTimeout = setTimeout(() => { paginaActual=1; cargarProductos(); }, 400); }
+  function limpiarFiltros() { document.getElementById('filtro-q').value=''; document.getElementById('filtro-estado').value=''; document.getElementById('filtro-activo').value='true'; paginaActual=1; cargarProductos(); }
+
+  async function cargarSelectores() {
+    const [cats, provs] = await Promise.all([get('/productos/catalogos/categorias'), get('/proveedores/?activo=true&limit=100')]);
+    if (cats?.ok) {
+      document.getElementById('prod-categoria').innerHTML = '<option value="">Sin categoría</option>' + cats.data.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+    }
+    if (provs?.ok) {
+      document.getElementById('prod-proveedor').innerHTML = '<option value="">Sin proveedor</option>' + provs.data.proveedores.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+    }
+  }
+
+  async function abrirModal() {
+    document.getElementById('modal-titulo').textContent = 'Nuevo Producto';
+    document.getElementById('prod-id').value = '';
+    ['prod-codigo','prod-nombre','prod-descripcion','prod-precio','prod-stock','prod-vencimiento'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('prod-stock-min').value = '5';
+    document.getElementById('prod-dias-alerta').value = '30';
+    document.getElementById('prefijo-hint').textContent = '';
+    await cargarSelectores();
+    document.getElementById('modal-producto').classList.add('active');
+  }
+
+  function editarProducto(p) {
+    document.getElementById('modal-titulo').textContent = 'Editar Producto';
+    document.getElementById('prod-id').value = p.id;
+    document.getElementById('prod-codigo').value = p.codigo;
+    document.getElementById('prod-nombre').value = p.nombre;
+    document.getElementById('prod-descripcion').value = p.descripcion || '';
+    document.getElementById('prod-precio').value = p.precio_unitario;
+    document.getElementById('prod-stock').value = p.stock;
+    document.getElementById('prod-stock-min').value = p.stock_minimo;
+    // FIX: mostrar fecha en formato dd/mm/aaaa
+    document.getElementById('prod-vencimiento').value = fechaISOToDisplay(p.fecha_vencimiento);
+    document.getElementById('prod-dias-alerta').value = p.dias_alerta_venc || 30;
+    document.getElementById('prefijo-hint').textContent = '';
+    cargarSelectores().then(() => {
+      document.getElementById('prod-categoria').value = p.categoria_id || '';
+      document.getElementById('prod-proveedor').value = p.proveedor_id || '';
+    });
+    document.getElementById('modal-producto').classList.add('active');
+  }
+
+  function cerrarModal() { document.getElementById('modal-producto').classList.remove('active'); }
+
+  async function guardarProducto() {
+    const id = document.getElementById('prod-id').value;
+    const fechaDisplay = document.getElementById('prod-vencimiento').value.trim();
+    const fechaISO = fechaDisplay ? fechaDisplayToISO(fechaDisplay) : null;
+
+    if (fechaDisplay && !fechaISO) {
+      toast('Formato de fecha inválido. Use dd/mm/aaaa (ej: 15/08/2027)', 'warning'); return;
+    }
+
+    const body = {
+      codigo:            document.getElementById('prod-codigo').value.trim().toUpperCase(),
+      nombre:            document.getElementById('prod-nombre').value.trim(),
+      descripcion:       document.getElementById('prod-descripcion').value.trim() || null,
+      precio_unitario:   parseFloat(document.getElementById('prod-precio').value),
+      stock:             parseInt(document.getElementById('prod-stock').value),
+      stock_minimo:      parseInt(document.getElementById('prod-stock-min').value),
+      fecha_vencimiento: fechaISO,
+      dias_alerta_venc:  parseInt(document.getElementById('prod-dias-alerta').value),
+      categoria_id:      document.getElementById('prod-categoria').value || null,
+      proveedor_id:      document.getElementById('prod-proveedor').value || null,
+    };
+
+    if (!body.codigo || !body.nombre || !body.precio_unitario) { toast('Completa los campos requeridos.', 'warning'); return; }
+    if (body.stock === null || isNaN(body.stock)) { toast('Ingresa el stock inicial.', 'warning'); return; }
+
+    const btn = document.getElementById('btn-guardar');
+    btn.disabled = true;
+    const data = id ? await put(`/productos/${id}`, body) : await post('/productos/', body);
+    btn.disabled = false;
+
+    if (data?.ok) {
+      toast(id ? 'Producto actualizado.' : 'Producto creado correctamente.');
+      cerrarModal(); cargarProductos();
+    } else {
+      toast(data?.message || 'Error al guardar.', 'error');
+    }
+  }
+
+  async function eliminarProducto(id, nombre) {
+    if (!confirmar(`¿Desactivar el producto "${nombre}"?`)) return;
+    const data = await del(`/productos/${id}`);
+    if (data?.ok) { toast('Producto desactivado.'); cargarProductos(); }
+    else toast(data?.message || 'Error.', 'error');
+  }
+
+  function abrirAjuste(id, nombre, stock) {
+    document.getElementById('ajuste-prod-id').value = id;
+    document.getElementById('ajuste-prod-nombre').textContent = `📦 ${nombre} — Stock actual: ${stock}`;
+    document.getElementById('ajuste-cantidad').value = stock;
+    document.getElementById('ajuste-motivo').value = '';
+    document.getElementById('modal-ajuste').classList.add('active');
+  }
+
+  function cerrarAjuste() { document.getElementById('modal-ajuste').classList.remove('active'); }
+
+  async function guardarAjuste() {
+    const id = document.getElementById('ajuste-prod-id').value;
+    const cant = parseInt(document.getElementById('ajuste-cantidad').value);
+    const motivo = document.getElementById('ajuste-motivo').value.trim() || 'Ajuste manual';
+    if (isNaN(cant) || cant < 0) { toast('Ingresa una cantidad válida.', 'warning'); return; }
+    const data = await post(`/productos/${id}/ajustar-stock`, { nueva_cantidad: cant, descripcion: motivo });
+    if (data?.ok) { toast('Stock ajustado correctamente.'); cerrarAjuste(); cargarProductos(); }
+    else toast(data?.message || 'Error.', 'error');
+  }
+
+  cargarProductos();
+</script>
+</body>
+</html>

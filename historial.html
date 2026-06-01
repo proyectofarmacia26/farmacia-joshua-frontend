@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial de Ventas — Farmacia Joshua</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Merriweather+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title">📋 Historial de Ventas</div>
+      <div class="topbar-meta">🕐 <span id="topbar-clock"></span></div>
+      <button class="topbar-alerts" onclick="window.location.href='alertas.html'">🔔<span class="alert-dot" id="alert-dot" style="display:none"></span></button>
+    </header>
+    <div class="page-content">
+      <div class="page-header">
+        <div><h2>Historial de Ventas</h2><p>Consulta y gestiona todas las ventas registradas</p></div>
+        <button class="btn btn-primary" onclick="window.location.href='ventas.html'">➕ Nueva Venta</button>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <div class="search-bar"><span class="search-icon">🔍</span><input type="text" id="filtro-cliente" placeholder="Buscar por cliente..." oninput="filtrar()"></div>
+          <input type="date" id="filtro-desde" class="form-control" style="width:150px;" onchange="filtrar()" title="Desde">
+          <input type="date" id="filtro-hasta" class="form-control" style="width:150px;" onchange="filtrar()" title="Hasta">
+          <select id="filtro-estado" class="form-control" style="width:150px;" onchange="filtrar()">
+            <option value="">Todos</option>
+            <option value="completada">Completadas</option>
+            <option value="anulada">Anuladas</option>
+          </select>
+          <select id="filtro-pago" class="form-control" style="width:150px;" onchange="filtrar()">
+            <option value="">Forma de pago</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+            <option value="transferencia">Transferencia</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="limpiarFiltros()">✕ Limpiar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Código</th><th>Fecha</th><th>Cliente</th><th>Cajero</th><th>Total</th><th>Pago</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="tabla-ventas"><tr class="loading-row"><td colspan="8"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+        <div id="paginacion"></div>
+        <div id="tabla-info" style="text-align:center;font-size:.8rem;color:var(--gris-texto);margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal detalle venta -->
+<div class="modal-overlay" id="modal-detalle">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <h3>🧾 Detalle de Venta</h3>
+      <button class="btn-close-modal" onclick="cerrarDetalle()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-detalle-body"><div class="spinner"></div></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="cerrarDetalle()">Cerrar</button>
+      <button class="btn btn-primary" id="btn-imprimir" onclick="imprimirRecibo()" style="display:none">🖨️ Imprimir Recibo</button>
+      <button class="btn btn-danger" id="btn-anular" onclick="anularVentaActual()" style="display:none">❌ Anular Venta</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+  initLayout('historial');
+  let paginaActual = 1; let ventaActualId = null;
+  const LIMIT = 15;
+
+  async function cargarVentas() {
+    const cliente = document.getElementById('filtro-cliente').value.trim();
+    const desde   = document.getElementById('filtro-desde').value;
+    const hasta   = document.getElementById('filtro-hasta').value;
+    const estado  = document.getElementById('filtro-estado').value;
+    const pago    = document.getElementById('filtro-pago').value;
+
+    let url = `/ventas/?page=${paginaActual}&limit=${LIMIT}`;
+    if (cliente) url += `&cliente=${encodeURIComponent(cliente)}`;
+    if (desde)   url += `&fecha_inicio=${desde}`;
+    if (hasta)   url += `&fecha_fin=${hasta}`;
+    if (estado)  url += `&estado=${estado}`;
+    if (pago)    url += `&forma_pago=${pago}`;
+
+    document.getElementById('tabla-ventas').innerHTML = '<tr class="loading-row"><td colspan="8"><div class="spinner"></div></td></tr>';
+    const data = await get(url);
+    if (!data?.ok) return;
+    const { ventas, total, total_pages } = data.data;
+    document.getElementById('tabla-info').textContent = `Mostrando ${ventas.length} de ${total} ventas`;
+
+    if (ventas.length === 0) {
+      document.getElementById('tabla-ventas').innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><p>No se encontraron ventas</p></div></td></tr>`;
+      return;
+    }
+
+    document.getElementById('tabla-ventas').innerHTML = ventas.map(v => `
+      <tr>
+        <td><code style="background:var(--gris-bg);padding:2px 6px;border-radius:4px;font-size:.75rem;">${v.codigo_venta}</code></td>
+        <td style="font-size:.82rem;">${fmt.fechaHora(v.fecha_venta)}</td>
+        <td style="font-weight:600;">${v.cliente_nombre}</td>
+        <td style="font-size:.82rem;color:var(--gris-texto);">${v.cajero_nombre}</td>
+        <td style="font-weight:700;color:var(--verde-principal);">${fmt.moneda(v.total)}</td>
+        <td><span class="badge badge-azul" style="text-transform:capitalize;">${v.forma_pago}</span></td>
+        <td>${v.estado === 'completada' ? '<span class="badge badge-verde">✅ Completada</span>' : '<span class="badge badge-rojo">❌ Anulada</span>'}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="verDetalle('${v.id}','${v.estado}')">👁 Ver</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+    renderPagination('paginacion', paginaActual, total_pages, 'cambiarPagina');
+  }
+
+  function cambiarPagina(p) { paginaActual = p; cargarVentas(); }
+  let ft; function filtrar() { clearTimeout(ft); ft = setTimeout(() => { paginaActual=1; cargarVentas(); }, 400); }
+  function limpiarFiltros() { ['filtro-cliente','filtro-desde','filtro-hasta'].forEach(id => document.getElementById(id).value=''); document.getElementById('filtro-estado').value=''; document.getElementById('filtro-pago').value=''; paginaActual=1; cargarVentas(); }
+
+  async function verDetalle(id, estado) {
+    ventaActualId = id;
+    document.getElementById('modal-detalle-body').innerHTML = '<div class="spinner"></div>';
+    document.getElementById('modal-detalle').classList.add('active');
+    document.getElementById('btn-anular').style.display = Auth.isAdmin() && estado === 'completada' ? 'inline-flex' : 'none';
+    document.getElementById('btn-imprimir').style.display = estado === 'completada' ? 'inline-flex' : 'none';
+
+    const data = await get(`/ventas/${id}`);
+    if (!data?.ok) return;
+    const v = data.data;
+    const d = v.detalle || [];
+
+    document.getElementById('modal-detalle-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;font-size:.84rem;">
+        <div><strong style="color:var(--gris-texto);">Código:</strong> ${v.codigo_venta}</div>
+        <div><strong style="color:var(--gris-texto);">Fecha:</strong> ${fmt.fechaHora(v.fecha_venta)}</div>
+        <div><strong style="color:var(--gris-texto);">Cliente:</strong> ${v.cliente_nombre}</div>
+        <div><strong style="color:var(--gris-texto);">Cajero:</strong> ${v.cajero_nombre}</div>
+        <div><strong style="color:var(--gris-texto);">Forma de pago:</strong> ${v.forma_pago}</div>
+        <div><strong style="color:var(--gris-texto);">Estado:</strong> ${v.estado === 'completada' ? '✅ Completada' : '❌ Anulada'}</div>
+      </div>
+      <div class="table-wrapper" style="margin-bottom:16px;">
+        <table>
+          <thead><tr><th>Cant.</th><th>Código</th><th>Producto</th><th>P. Unit.</th><th>Desc.</th><th>Subtotal</th></tr></thead>
+          <tbody>${d.map(i => `
+            <tr>
+              <td>${i.cantidad}</td><td>${i.codigo}</td><td>${i.producto_nombre}</td>
+              <td>${fmt.moneda(i.precio_unitario)}</td>
+              <td>${parseFloat(i.descuento) > 0 ? fmt.moneda(i.descuento) : '—'}</td>
+              <td style="font-weight:700;">${fmt.moneda(i.subtotal)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <div style="min-width:260px;background:var(--gris-bg);border-radius:10px;padding:14px 16px;font-size:.875rem;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="color:var(--gris-texto);">Subtotal:</span><span>${fmt.moneda(v.subtotal)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="color:var(--rojo);">Descuento:</span><span style="color:var(--rojo);">- ${fmt.moneda(v.descuento_total)}</span></div>
+          
+          <div style="display:flex;justify-content:space-between;border-top:2px solid var(--gris-borde);margin-top:8px;padding-top:8px;font-weight:800;font-size:1rem;"><span>TOTAL:</span><span style="color:var(--verde-principal);">${fmt.moneda(v.total)}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:.82rem;"><span style="color:var(--gris-texto);">Pagado:</span><span>${fmt.moneda(v.monto_pagado)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:.82rem;"><span style="color:var(--gris-texto);">Cambio:</span><span>${fmt.moneda(v.cambio)}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function cerrarDetalle() { document.getElementById('modal-detalle').classList.remove('active'); ventaActualId = null; }
+
+  async function anularVentaActual() {
+    if (!ventaActualId || !confirmar('¿Anular esta venta? El stock será restaurado automáticamente.')) return;
+    const data = await put(`/ventas/${ventaActualId}/anular`);
+    if (data?.ok) { toast('Venta anulada. Stock restaurado.', 'success'); cerrarDetalle(); cargarVentas(); }
+    else toast(data?.message || 'Error.', 'error');
+  }
+
+  function imprimirRecibo() { window.print(); }
+
+  cargarVentas();
+</script>
+</body>
+</html>
